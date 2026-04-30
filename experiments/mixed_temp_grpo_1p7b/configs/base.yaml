@@ -1,0 +1,120 @@
+experiment:
+  name: mixed_temp_grpo_1p7b
+  method: mixed_grouped
+  control_count: 2
+  explore_count: 6
+  total_group_size: 8
+  update_control_arm: false
+  temperatures:
+    low: 0.3
+    high: 1.2
+  calibration:
+    candidate_low: [0.3, 0.4]
+    candidate_high: [0.8, 1.0, 1.2]
+    n_probe: 8
+    prompt_limit: 128
+    min_pass_rate: 0.05
+    max_pass_rate: 0.8
+    min_variance: 0.0
+    min_extraction_rate: 0.8
+  analysis:
+    record_all_samples: true
+    dump_legacy_samples: false
+    sample_dump_steps: [1, 50, 100, 200]
+  analysis_dir: ${PROJECT_ROOT}/experiments/mixed_temp_grpo_1p7b/outputs/analysis
+
+custom_reward_function:
+  name: compute_score
+
+reward_model:
+  enable: false
+  reward_manager: naive
+  launch_reward_fn_async: false
+
+data:
+  train_files: ${PROJECT_ROOT}/experiments/mixed_temp_grpo_1p7b/outputs${DATA_DIR}/train_medium.parquet
+  val_files: ${PROJECT_ROOT}/experiments/mixed_temp_grpo_1p7b/outputs${DATA_DIR}/val_full.parquet
+  prompt_key: prompt
+  reward_fn_key: data_source
+  truncation: left
+  max_prompt_length: 2048
+  max_response_length: 8192
+  train_batch_size: 128
+  seed: 1
+  filter_overlong_prompts: true
+  return_raw_chat: false
+  return_full_prompt: false
+  apply_chat_template_kwargs:
+    enable_thinking: true
+
+algorithm:
+  adv_estimator: grpo
+  norm_adv_by_std_in_grpo: true
+  use_kl_in_reward: false
+
+actor_rollout_ref:
+  model:
+    path: ${MODEL_DIR}/Qwen3-1.7B
+    trust_remote_code: true
+    use_remove_padding: true
+    enable_gradient_checkpointing: true
+  actor:
+    strategy: fsdp
+    use_dynamic_bsz: true
+    ppo_mini_batch_size: 32
+    ppo_micro_batch_size_per_gpu: 4
+    ppo_max_token_len_per_gpu: 10240
+    use_kl_loss: true
+    kl_loss_coef: 0.0
+    entropy_coeff: 0.0
+    loss_agg_mode: token-mean
+    optim:
+      lr: 1e-6
+      lr_warmup_steps: 10
+      weight_decay: 0.1
+  ref:
+    strategy: fsdp
+    log_prob_use_dynamic_bsz: true
+    log_prob_micro_batch_size_per_gpu: 4
+    log_prob_max_token_len_per_gpu: 10240
+    fsdp_config:
+      param_offload: false
+  rollout:
+    name: vllm
+    mode: sync
+    n: 8
+    temperature: 1.2
+    top_p: 1.0
+    top_k: -1
+    do_sample: true
+    tensor_model_parallel_size: 4
+    gpu_memory_utilization: 0.85
+    log_prob_use_dynamic_bsz: true
+    log_prob_micro_batch_size_per_gpu: 4
+    log_prob_max_token_len_per_gpu: 10240
+    max_num_seqs: 1024
+    max_num_batched_tokens: 10240
+    val_kwargs:
+      n: 8
+      temperature: 0.6
+      top_p: 1.0
+      top_k: -1
+      do_sample: true
+
+critic:
+  strategy: fsdp
+
+trainer:
+  logger: ["console", "tensorboard"]
+  project_name: cceRL
+  experiment_name: mixed-temp-grpo-1p7b
+  nnodes: 1
+  n_gpus_per_node: 8
+  save_freq: 200
+  test_freq: 5
+  total_epochs: 2
+  critic_warmup: 0
+  val_before_train: false
+  resume_mode: auto
+  balance_batch: false
+  default_local_dir: ${CKPT_DIR}

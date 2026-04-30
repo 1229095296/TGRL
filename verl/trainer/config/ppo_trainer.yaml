@@ -1,0 +1,451 @@
+# Format checks enforced on CI:
+# 1. Comments must appear above each field.
+# 2. There must be a blank line between each field.
+# 3. Inline comments (after a field on the same line) are not allowed.
+# 4. Indentation level is respected for nested fields.
+
+# specify the default per-component configs
+defaults:
+
+  # <folder_name>@<field_name>.<field_name>: <yaml_file_name>
+  # actor_rollout_ref.actor: trainer/config/actor/dp_actor.yaml
+  - actor@actor_rollout_ref.actor: dp_actor
+
+  # trainer.npu_profile: trainer/config/npu_profile/npu_profile.yaml
+  - npu_profile@trainer.npu_profile: npu_profile
+
+  # data: trainer/config${DATA_DIR}/legacy_data.yaml
+  - data@data: legacy_data
+
+  # Reference model config.
+  # Reference model will be enabled when actor.use_kl_loss or/and algorithm.use_kl_in_reward is/are True.
+  - ref@actor_rollout_ref.ref: dp_ref
+
+  # Rollout model config.
+  - rollout@actor_rollout_ref.rollout: rollout
+
+  # Critic model config.
+  - critic@critic: dp_critic
+
+  # Reward model config.
+  - reward_model@reward_model: dp_reward_model
+
+  # load the reference default config, then apply the fields in the current yaml
+  # self config override anything above
+  - _self_
+
+# config for actor, rollout and reference model
+actor_rollout_ref:
+
+  # Whether it's a hybrid engine, currently only supports hybrid engine
+  hybrid_engine: true
+
+  # common configs for the model
+  model:
+
+    # Huggingface model path. This can be either local path or HDFS path.
+    path: ~/models/deepseek-llm-7b-chat
+
+    # Custom chat template for the model.
+    custom_chat_template: null
+
+    # Whether to use shared memory (SHM) for accelerating the loading of model weights
+    use_shm: false
+
+    # Additional Python packages to register huggingface models/tokenizers.
+    external_lib: null
+
+    # Used to override model's original configurations, mainly dropout
+    override_config: {}
+
+    # Enable gradient checkpointing for actor
+    enable_gradient_checkpointing: true
+
+    # Enable activation offloading for actor
+    enable_activation_offload: false
+
+    # Whether to remove padding tokens in inputs during training
+    use_remove_padding: false
+
+    # Set to positive value to enable LoRA (e.g., 32)
+    lora_rank: 0
+
+    # LoRA scaling factor
+    lora_alpha: 16
+
+    # Target modules to apply LoRA. Options: "all-linear" (not recommended for VLMs) or
+    # [q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj]
+    target_modules: all-linear
+
+    # Exclude modules from applying Lora. Similar usage to target_modules and Peft.
+    # Example: '.*visual.*' for excluding the ViT in Qwen2.5-VL, as currently vllm does not support ViT Lora.
+    exclude_modules: null
+
+    # Whether to use Liger for linear layer fusion
+    use_liger: false
+
+    # Whether to use custom fused kernels (e.g., FlashAttention, fused MLP)
+    use_fused_kernels: false
+
+    # Options for fused kernels. If use_fused_kernels is true, this will be used.
+    fused_kernel_options:
+
+      # Implementation backend for fused kernels. Options: "triton" or "torch".
+      impl_backend: torch
+
+    # Whether to enable loading a remote code model
+    trust_remote_code: false
+
+  # Rollout model config.
+  rollout:
+
+    # may get higher throughput when set to True. When activated, Please increase max_num_batched_tokens or decrease max_model_len.
+    enable_chunked_prefill: True
+
+    # Which loader to use for rollout model weights: dummy_dtensor, hf, megatron, etc.
+    # safetensors (for huge model, and set use_shm=True); dummy_dtensor: randomly init model weight
+    load_format: dummy_dtensor
+
+    # for huge model, layered summon can save memory (prevent OOM) but make it slower
+    layered_summon: False
+
+  # profiler configs
+  profiler:
+
+    # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs in the entrypoint
+    _target_: verl.utils.profiler.ProfilerConfig
+
+    # True for each task has its own database, False for all tasks in one training step share one database.
+    discrete: False
+
+    # Whether to profile all ranks.
+    all_ranks: False
+
+    # The ranks that will be profiled. [] or [0,1,...]
+    ranks: []
+
+# custom reward function definition
+custom_reward_function:
+
+  # The path to the file containing your customized reward function.
+  # If not specified, pre-implemented reward functions will be used.
+  path: null
+
+  # The name of the reward function within the specified file. Default is 'compute_score'.
+  name: compute_score
+
+# config for the algorithm
+algorithm:
+
+  # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs in the entrypoint
+  _target_: verl.trainer.config.AlgoConfig
+
+  # Discount factor for future rewards
+  gamma: 1.0
+
+  # Trade-off between bias and variance in the GAE estimator
+  lam: 1.0
+
+  # Advantage estimator type: "gae", "grpo", "reinforce_plus_plus", etc.
+  adv_estimator: gae
+
+  # Whether to normalize advantages by std (specific to GRPO)
+  norm_adv_by_std_in_grpo: True
+
+  # Whether to enable in-reward KL penalty
+  use_kl_in_reward: False
+
+  # How to estimate KL divergence: "kl", "abs", "mse", "low_var_kl", or "full"
+  kl_penalty: kl
+
+  # KL control configuration
+  kl_ctrl:
+
+    # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs in the entrypoint
+    _target_: verl.trainer.config.KLControlConfig
+
+    # KL control type: "fixed" or "adaptive"
+    type: fixed
+
+    # Initial coefficient for KL penalty
+    kl_coef: 0.001
+
+    # Horizon value for adaptive controller (if enabled)
+    horizon: 10000
+
+    # Target KL divergence (used for adaptive controller)
+    target_kl: 0.1
+
+  # Whether to enable preference feedback PPO
+  use_pf_ppo: False
+
+  # Preference feedback PPO settings
+  pf_ppo:
+
+    # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs in the entrypoint
+    _target_: verl.trainer.config.PFPPOConfig
+
+    # Method for reweighting samples: "pow", "max_min", or "max_random"
+    reweight_method: pow
+
+    # Power used for weight scaling in "pow" method
+    weight_pow: 2.0
+
+  # Token-level Entropy-Weighted Advantage Reweighting Configuration
+  per:
+
+    # Required when using verl.utils.omega_conf_to_dataclass to instantiate dataclass configs in the entrypoint
+    _target_: verl.trainer.config.PERConfig
+
+    # Enable baseline+exploration advantage reweighting
+    # Warmup Strategy (steps < warmup_steps): All samples use T=T1 (standard GRPO)
+    # After Warmup (steps >= warmup_steps):
+    #   - Sample 0 (T=T0): Baseline, weight=0 (不参与梯度更新)
+    #   - Sample 1+ (T=T1, A≥0): Token-level entropy weighting w(ΔH)
+    #   - Sample 1+ (T=T1, A<0): weight=1.0 (正常惩罚)
+    enable_token_entropy_weighting: False
+
+    # Number of warmup steps using standard GRPO (all samples at T1)
+    warmup_steps: 20
+
+    # Baseline temperature (T0) for Sample 0
+    # Should match the first temperature in rollout.hybrid_exploration.temperatures
+    entropy_t0: 0.3
+
+    # Exploratory temperature (T1) for Sample 1+
+    # Should match the second temperature in rollout.hybrid_exploration.temperatures
+    entropy_t1: 1.2
+
+    # Maximum entropy increment (clamp ΔH to [0, deltah_max])
+    entropy_deltah_max: 6.0
+
+    # Clip final token-level advantages to [-clip, clip]
+    entropy_adv_clip: 10.0
+
+    # Small constant for numerical stability
+    entropy_eps: 1e-8
+
+    # Legacy compatibility field. The current ATJS1ctrl gate is fixed to
+    # ratio -> log1p -> quantile -> renorm and ignores this value.
+    js_weight_lambda: 0.0
+
+    # Apply row-wise quantile clipping before renormalization
+    js_weight_quantile_clip: True
+
+    # Lower row-wise quantile for token JS weights
+    js_weight_quantile_low: 0.05
+
+    # Upper row-wise quantile for token JS weights
+    js_weight_quantile_high: 0.95
+
+    # Legacy compatibility field; the fixed ATJS1ctrl gate no longer uses clamp
+    js_weight_min: 0.2
+
+    # Legacy compatibility field; the fixed ATJS1ctrl gate no longer uses clamp
+    js_weight_max: 5.0
+
+    # Enable adaptive T1 controller for exploration temperature
+    adaptive_t1_enable: False
+
+    # EMA coefficient for the ATJS1-style adaptive T1 utility signal
+    adaptive_t1_ema_beta: 0.9
+
+    # Step size applied to the EMA-smoothed utility signal
+    adaptive_t1_step_size: 0.5
+
+    # Maximum absolute T1 change allowed per training step
+    adaptive_t1_max_delta: 0.05
+
+    # Lower bound for exploration temperature T1
+    adaptive_t1_min: 0.6
+
+    # Upper bound for exploration temperature T1
+    adaptive_t1_max: 1.8
+
+    # TAMPO: Temperature Adaptive Meta Policy Optimization.
+    # Disabled by default; when enabled, rollout uses one sampled temperature per step.
+    tampo_enable: False
+    tampo_candidate_temperatures: [0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5]
+    tampo_warmup_steps: 0
+    tampo_warmup_ratio: 0.1
+    tampo_warmup_temperature: 1.0
+    tampo_ema_alpha: 0.05
+    tampo_top_p: 0.7
+    tampo_seed: 0
+
+    # Whether to dump token-level JS visualization HTML/JSON for manual inspection
+    js_token_visualization_enable: False
+
+    # Dump frequency in training steps; non-positive values disable dumping
+    js_token_visualization_freq: 0
+
+    # Maximum number of prompt groups to export per dump
+    js_token_visualization_max_groups: 2
+
+    # Maximum number of response tokens to visualize per sample
+    js_token_visualization_max_tokens_per_sample: 256
+
+    # Output directory for token-level JS visualization; null falls back to trainer.default_local_dir/js_token_visualization
+    js_token_visualization_output_dir: null
+
+# config for the trainer
+trainer:
+
+  # Whether to balance batch sizes across distributed workers
+  balance_batch: True
+
+  # Number of epochs in training
+  total_epochs: 30
+
+  # Total training steps (can be set explicitly or derived from epochs)
+  total_training_steps: null
+
+  # The steps that will be profiled. null means no profiling. null or [1,2,5,...]
+  profile_steps: null
+
+  # controller Nvidia Nsight Systems Options. Must set when profile_steps is not None.
+  ## reference https://docs.nvidia.com/nsight-systems/UserGuide/index.html
+  ## reference https://docs.ray.io/en/latest/ray-observability/user-guides/profiling.html
+  controller_nsight_options:
+
+    # Select the API(s) to be traced.
+    trace: "cuda,nvtx,cublas,ucx"
+
+    # Track the GPU memory usage by CUDA kernels. Must be string type "true" or "false".
+    cuda-memory-usage: "true"
+
+    # CUDA graphs will be traced as a whole
+    cuda-graph-trace: "graph"
+
+  # worker Nvidia Nsight Systems Options. Must set when profile_steps is not None.
+  worker_nsight_options:
+
+    # Select the API(s) to be traced.
+    trace: "cuda,nvtx,cublas,ucx"
+
+    # Track the GPU memory usage by CUDA kernels. Must be string type "true" or "false".
+    cuda-memory-usage: "true"
+
+    # CUDA graphs will be traced as a whole
+    cuda-graph-trace: "graph"
+
+    # Profiling only in a range of torch.cuda.profiler.start and stop. Do not change this config.
+    capture-range: "cudaProfilerApi"
+
+    # Specify the desired behavior when a capture range ends.
+    # In verl we need the orch.cuda.profiler.start/stop pair to repeats n times.
+    # valid values are "repeat-shutdown:n" or null.
+    # For normal whole step profiling, n = len(profile_steps);
+    # but for discrete profiling, n = len(profile_steps) * Number(subtasks).
+    # Or you can just leave it null and the program will use n = len(profile_steps) * 6;
+    capture-range-end: null
+
+    # Send signal to the target application's process group. We let the program to exit by itself.
+    kill: none
+
+  # Project name for experiment tracking (e.g., wandb)
+  project_name: verl_examples
+
+  # Experiment name for run identification in tracking tools
+  experiment_name: gsm8k
+
+  # Logging backends to use: "console", "wandb", etc.
+  logger: [ 'console', 'wandb' ]
+
+  # Number of generations to log during validation
+  log_val_generations: 0
+
+  # Directory for logging rollout data; no dump if null
+  rollout_data_dir: null
+
+  # Directory for logging validation data; no dump if null
+  validation_data_dir: null
+
+  # Number of nodes used in the training
+  nnodes: 1
+
+  # Number of GPUs per node
+  n_gpus_per_node: 8
+
+  # Save frequency (by iteration) for model checkpoints
+  save_freq: -1
+
+  # ESI refers to the elastic server instance used during training, similar to the training plan. For example,
+  # if you purchase 10 hours of computing power, the ESI will automatically shut down after 10 hours of training.
+  # To ensure a checkpoint is saved before ESI shuts down, the system will start saving a checkpoint in advance.
+  # The advance time is calculated as: Advance Time = Longest historical step duration + Checkpoint save duration + esi_redundant_time.
+  # Here, esi_redundant_time is a user-defined value that further extends the advance time for added safety.
+  esi_redundant_time: 0
+
+  # Resume mode: "auto", "disable", or "resume_path"
+  # "auto": resume from last checkpoint if available
+  # "disable": start from scratch
+  # "resume_path": resume from a user-defined path
+  resume_mode: auto
+
+  # Path to resume training from (only used when resume_mode is "resume_path")
+  resume_from_path: null
+
+  # Whether to run validation before training begins
+  val_before_train: True
+
+  # Whether to run validation only
+  val_only: False
+
+  # Validation frequency (in training iterations)
+  test_freq: -1
+
+  # Number of iterations to warm up the critic before updating policy
+  critic_warmup: 0
+
+  # Default path to distributed filesystem for saving checkpoints
+  default_hdfs_dir: null
+
+  # Whether to delete local checkpoints after loading
+  del_local_ckpt_after_load: False
+
+  # Default local directory for saving checkpoints
+  default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}
+
+  # Structured wall-clock study logging for efficiency analysis
+  wallclock_study:
+
+    # Enable wall-clock instrumentation that writes one JSONL event per raw training cycle
+    enable: False
+
+    # Start measuring after this effective optimization step (exclusive)
+    start_after_step: 20
+
+    # Fixed wall-clock budget used by downstream analysis scripts
+    fixed_budget_hours: 12.0
+
+    # Primary validation metric used in wall-clock summary scripts
+    primary_metric_key: val-core/aime_combined_score
+
+    # Output subdirectory under trainer.default_local_dir
+    output_subdir: wallclock_study
+
+  # Maximum number of actor checkpoints to keep
+  max_actor_ckpt_to_keep: null
+
+  # Maximum number of critic checkpoints to keep
+  max_critic_ckpt_to_keep: null
+
+  # Timeout (in seconds) for Ray worker to wait for registration
+  ray_wait_register_center_timeout: 300
+
+  # Device to run training on (e.g., "cuda", "cpu")
+  device: cuda
+
+  # whether to use legacy worker implementation
+  #  mode: "auto", "enable", or "disable"
+  use_legacy_worker_impl: auto
+
+# configs related to ray initialization
+ray_init:
+
+  # Number of CPUs for Ray. Use a fixed number instead of null when using SLURM.
+  num_cpus: null
+
+  # Path to save Ray timeline JSON for performance profiling
+  timeline_json_file: null

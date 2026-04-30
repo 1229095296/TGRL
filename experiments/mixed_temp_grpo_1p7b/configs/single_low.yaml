@@ -1,0 +1,12 @@
+experiment:
+  method: single_low
+  control_count: 2
+  explore_count: 6
+  total_group_size: 8
+  temperatures:
+    low: 0.3
+    high: 1.2
+
+trainer:
+  experiment_name: mixed-temp-grpo-1p7b-single-low
+  default_local_dir: ${CKPT_DIR}

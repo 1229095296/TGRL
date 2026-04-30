@@ -1,0 +1,81 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environments
+.env
+.env.*
+!.env.example
+*.local
+.venv/
+venv/
+env/
+
+# IDE and OS metadata
+.vscode/
+.idea/
+.DS_Store
+
+# Checkpoints and model weights
+ckpt/
+ckpts/
+checkpoint/
+checkpoints/
+model_ckpt/
+saved_models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+
+# Logs and experiment outputs
+outputs/
+runs/
+logs/
+log/
+tensorboard/
+tensorboard_log/
+tb_logs/
+wandb/
+.wandb/
+events.out.tfevents*
+*.log
+*.out
+*.err
+
+# Data and intermediate artifacts
+data/
+dataset/
+datasets/
+*.parquet
+*.arrow
+*.jsonl
+*.csv
+*.tsv
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.lmdb
+*.sqlite
+*.db
+
+# Archives and build products
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.gz
+build/
+dist/
+*.egg-info/
