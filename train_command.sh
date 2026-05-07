@@ -22,7 +22,7 @@ save_freq="${SAVE_FREQ:-500}"
 dapo_train_path="${TRAIN_FILE:-${DATA_DIR}/deepscaler.parquet}"
 r1_test_path="${VAL_FILE:-${DATA_DIR}/validation.parquet}"
 
-experiment_name="${EXPERIMENT_NAME:-anonymous-ATJS-r4-14B-wallclockTime-$(date +%Y%m%d_%H%M)}"
+experiment_name="${EXPERIMENT_NAME:-anonymous}"
 max_prompt_length="${MAX_PROMPT_LENGTH:-2048}"
 max_response_length="${MAX_RESPONSE_LENGTH:-8192}"
 output_dir="${OUTPUT_DIR:-${CKPT_DIR}/${experiment_name}}"
