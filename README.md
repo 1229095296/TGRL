@@ -53,9 +53,9 @@ The result is stronger and faster RLVR training under the **same rollout budget*
 ## 🧠 Method
 
 <p align="center">
-  <img src="assets/tgrl_framework.png" width="100%" alt="Overview of the TGRL framework">
+  <img src="assets/tgrl_framework.png" width="100%" alt="TGRL framework: mixed-temperature exploration-gain estimation and JS-based token credit allocation">
 </p>
-<p align="center"><em>Figure 1. TGRL estimates prompt-level exploration gain from low-/high-temperature reward contrast and allocates it to temperature-sensitive tokens through JS divergence.</em></p>
+<p align="center"><em>TGRL framework. Low-temperature rollouts provide a reference, high-temperature rollouts explore, and their reward contrast is allocated to temperature-sensitive tokens through JS divergence.</em></p>
 
 For every prompt, TGRL forms one temperature-contrastive rollout group. Low-temperature samples act as references, while high-temperature samples explore alternative reasoning trajectories under the same rollout budget.
 
@@ -142,9 +142,9 @@ The largest ALFWorld sub-task gain appears on **Pick2**, where TGRL reaches **95
 ### Training dynamics
 
 <p align="center">
-  <img src="assets/training_dynamics.png" width="100%" alt="TGRL training dynamics on Qwen3-14B">
+  <img src="assets/training_dynamics.png" width="100%" alt="Training dynamics of TGRL and GRPO variants on Qwen3-14B">
 </p>
-<p align="center"><em>Figure 2. Training dynamics on Qwen3-14B. TGRL achieves stronger downstream accuracy with shorter responses and less truncation than fixed-temperature GRPO variants.</em></p>
+<p align="center"><em>Training dynamics on Qwen3-14B across accuracy, reward, optimization statistics, response length, and clipping ratio. TGRL achieves stronger downstream accuracy while producing shorter, less-truncated responses.</em></p>
 
 On the Qwen3-14B run, TGRL also shows more efficient generation dynamics:
 
